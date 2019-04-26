@@ -1,4 +1,5 @@
-{ stdenv, fetchurl, acl, libcap }:
+{ stdenv, fetchurl, acl, libcap,
+darwin }:
 
 stdenv.mkDerivation rec {
   name = "cdrtools-${version}";
@@ -11,7 +12,10 @@ stdenv.mkDerivation rec {
 
   patches = [ ./fix-paths.patch ];
 
-  buildInputs = [ acl libcap ];
+  buildInputs =
+    stdenv.lib.optionals (!stdenv.isDarwin) [ acl libcap ]
+    ++ stdenv.lib.optionals stdenv.isDarwin [ darwin.IOKit ]
+  ;
 
   postPatch = ''
     sed "/\.mk3/d" -i libschily/Targets.man
@@ -20,9 +24,17 @@ stdenv.mkDerivation rec {
 
   configurePhase = "true";
 
+  doBuild = false;
+
   GMAKE_NOWARN = true;
 
-  makeFlags = [ "INS_BASE=/" "INS_RBASE=/" "DESTDIR=$(out)" ];
+  # default makePhase fails: need to set compiler on darwin to cc instead of clang
+  #makeFlags = [ "INS_BASE=/" "INS_RBASE=/" "DESTDIR=$(out)" ];
+  # this fails too:
+  # 'missing' -Llibs/i386-darwin-clang dir
+  installPhase = ''
+    make INS_BASE=#{out} INS_RBASE=#{out} DESTDIR=#{out} install
+  '';
 
   meta = with stdenv.lib; {
     homepage = https://sourceforge.net/projects/cdrtools/;
