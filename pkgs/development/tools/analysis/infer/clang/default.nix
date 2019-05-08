@@ -10,14 +10,15 @@ xpc }:
 
 stdenv.mkDerivation rec {
   name = "facebook-clang";
+  pname = "llvm_clang_compiler-rt_libcxx_libcxxabi_openmp";
   tag = "36266f6c86041896bed32ffec0637fefbc4463e0";
-  version = "7.0";
+  version = "7.0.1";
 
   # NOTE! this is just a dep of the facebook-clang-plugins project
   src = fetchurl {
-    # this is the clang version used by infer v0.15.0 (8bda23fadcc51c6ed38a4c3a75be25a266e8f7b4)
-    url = "https://github.com/facebook/facebook-clang-plugins/raw/${tag}/clang/src/clang-${version}.tar.xz";
-    sha256 = "1fq7dkiksw1fhdxh401xqkbq3qzakkhy6i2myjr6drj37fhkgf19";
+    # this is the clang version used by infer v0.16.0
+    url = "https://github.com/facebook/facebook-clang-plugins/raw/${tag}/clang/src/${pname}-${version}.tar.xz";
+    sha256 = "06c8mv372rvgs2zq5pwlqyh8wx5pp6zrzbyz1a07ld58vwmc2whk";
   };
 
   # the srcfile looks like a gzip so nix unpackPhase gets confused
@@ -83,8 +84,8 @@ stdenv.mkDerivation rec {
     # setup opam stuff
     export OPAMROOT=${infer-deps}/opam
     export OPAM_BACKUP=${infer-deps}/opam.bak
-    export OCAML_VERSION='4.07.1+flambda'
-    export INFER_OPAM_SWITCH=infer-$OCAML_VERSION
+    export OCAML_VERSION='ocaml-variants.4.07.1+flambda'
+    export INFER_OPAM_SWITCH=$OCAML_VERSION
 
     # dumb hack: some opam operations need to write minor build files to opam repo
     chmod u+w ${infer-deps}
