@@ -1,10 +1,7 @@
-Subject: [PATCH] remove codesign use on apple
-
-diff --git a/cmake/modules/AddLLVM.cmake b/cmake/modules/AddLLVM.cmake
-index ce2057f8..8dbed01f 100644
---- a/llvm/cmake/modules/AddLLVM.cmake
-+++ b/llvm/cmake/modules/AddLLVM.cmake
-@@ -1598,26 +1598,6 @@ function(llvm_codesign name)
+diff -ur ./llvm/cmake/modules/AddLLVM.cmake ./llvm/cmake/modules/AddLLVM.cmake
+--- ./llvm/cmake/modules/AddLLVM.cmake	2018-08-01 03:51:55.000000000 -0400
++++ ./llvm/cmake/modules/AddLLVM.cmake	2019-05-09 16:06:31.456119724 -0400
+@@ -1598,26 +1598,6 @@
    if(NOT LLVM_CODESIGNING_IDENTITY)
      return()
    endif()
@@ -31,11 +28,10 @@ index ce2057f8..8dbed01f 100644
  endfunction()
  
  function(llvm_setup_rpath name)
-diff --git a/cmake/platforms/iOS.cmake b/cmake/platforms/iOS.cmake
-index 69f84797..d15db933 100644
---- a/llvm/cmake/platforms/iOS.cmake
-+++ b/llvm/cmake/platforms/iOS.cmake
-@@ -80,23 +80,3 @@ IF(NOT CMAKE_LIBTOOL)
+diff -ur ./llvm/cmake/platforms/iOS.cmake ./llvm/cmake/platforms/iOS.cmake
+--- ./llvm/cmake/platforms/iOS.cmake	2019-05-10 12:37:01.688274821 -0400
++++ ./llvm/cmake/platforms/iOS.cmake	2019-05-09 16:08:27.949546474 -0400
+@@ -80,23 +80,3 @@
    SET(CMAKE_LIBTOOL ${CMAKE_LIBTOOL_val} CACHE FILEPATH "Libtool")
    message(STATUS "Using libtool ${CMAKE_LIBTOOL}")
  ENDIF()
@@ -59,3 +55,32 @@ index 69f84797..d15db933 100644
 -      FILEPATH "Codesign_Allocate")
 -  message(STATUS "Using codesign_allocate ${CMAKE_CODESIGN_ALLOCATE}")
 -ENDIF()
+diff -ur ./llvm/projects/compiler-rt/cmake/Modules/AddCompilerRT.cmake ./llvm/projects/compiler-rt/cmake/Modules/AddCompilerRT.cmake
+--- ./llvm/projects/compiler-rt/cmake/Modules/AddCompilerRT.cmake	2018-07-10 09:00:17.000000000 -0400
++++ ./llvm/projects/compiler-rt/cmake/Modules/AddCompilerRT.cmake	2019-05-10 12:55:31.399913584 -0400
+@@ -290,14 +290,6 @@
+         set_target_properties(${libname} PROPERTIES IMPORT_PREFIX "")
+         set_target_properties(${libname} PROPERTIES IMPORT_SUFFIX ".lib")
+       endif()
+-      if(APPLE)
+-        # Ad-hoc sign the dylibs
+-        add_custom_command(TARGET ${libname}
+-          POST_BUILD  
+-          COMMAND codesign --sign - $<TARGET_FILE:${libname}>
+-          WORKING_DIRECTORY ${COMPILER_RT_LIBRARY_OUTPUT_DIR}
+-        )
+-      endif()
+     endif()
+     install(TARGETS ${libname}
+       ARCHIVE DESTINATION ${install_dir_${libname}}
+diff -ur ./llvm/projects/compiler-rt/test/sanitizer_common/ios_commands/iossim_compile.py ./llvm/projects/compiler-rt/test/sanitizer_common/ios_commands/iossim_compile.py
+--- ./llvm/projects/compiler-rt/test/sanitizer_common/ios_commands/iossim_compile.py	2017-04-28 00:55:35.000000000 -0400
++++ ./llvm/projects/compiler-rt/test/sanitizer_common/ios_commands/iossim_compile.py	2019-05-09 16:07:55.482727106 -0400
+@@ -26,7 +26,3 @@
+ ret = subprocess.call(sys.argv[1:])
+ if ret != 0:
+     sys.exit(ret)
+-
+-# If we produce a dylib, ad-hoc sign it.
+-if output_type in ['shared', 'dylib']:
+-    ret = subprocess.call(["codesign", "-s", "-", output])
