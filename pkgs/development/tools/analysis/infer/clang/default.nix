@@ -5,7 +5,6 @@ cmake, ncurses, perl, python, zlib,
 ocaml, opam,
 infer-deps,
 # Darwin support
-#xpc }:
 darwin
 }:
 
@@ -49,7 +48,6 @@ stdenv.mkDerivation rec {
     mangle_suppress_errors
   ]
   ++ stdenv.lib.optionals stdenv.isDarwin [
-    # fuck codesign
     ./codesign.patch
   ];
 
@@ -111,7 +109,8 @@ stdenv.mkDerivation rec {
   ++ stdenv.lib.optionals stdenv.isDarwin [ darwin.libobjc darwin.apple_sdk.libs.xpc ]
   ;
 
-  outputs = [ "out" ];
+  # try manually specifying outputs so we get flags properly made up in infer drv
+  outputs = [ "bin" "include" "lib" "libexec" "share" ];
 
   postUnpack = "
     # setup opam stuff
@@ -149,7 +148,7 @@ stdenv.mkDerivation rec {
     mv $OPAM_BACKUP $OPAMROOT
 
     # patch the built clang
-    pushd $out/install
+    pushd $out/include
     patch --batch -p 2 < ${attr_dump_cpu_cases_compilation_fix}
     popd
   ";

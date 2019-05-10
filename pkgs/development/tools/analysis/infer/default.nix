@@ -1,18 +1,15 @@
 { stdenv, fetchFromGitHub,
 callPackage,
 autoconf, automake, cmake, gcc, git, gnum4, ocaml, opam, openjdk, perl, pkgconfig, python2, sqlite, which, zlib,
-#xpc,
 darwin,
-#withC ? true,
+withC ? true,
 withJava ? true
 }:
 
-let withC = true; in
 let
   infer-deps = callPackage ./deps {};
   facebook-clang = callPackage ./clang {
     inherit infer-deps;
-    #inherit xpc;
     inherit darwin;
   };
 in
@@ -33,12 +30,13 @@ stdenv.mkDerivation rec {
   #
   # i should fetch this so i can do the linking manually
   # check : can i just fetchSubmodules=true and go from there?
+  # 	NO! - not sure why submodules doesnt work, but it doesn't
   # i think i tried that, but it's tough to force that sutff to make?
   facebook-clang-plugins = fetchFromGitHub {
     owner = "facebook";
     repo = "facebook-clang-plugins";
-    rev = "f31f7c9c28d8fb9b59c0dacc74a24e4bfe90a904";
-    sha256 = "11icpjm73xmyjla9cgg117sn380iibcd3xk743v0z8scwi79aaq8";
+    rev = "36266f6c86041896bed32ffec0637fefbc4463e0";
+    sha256 = "1iwpjwjl6p9y0b4s8zcsdwfy8pwik1zv1hl9shwl7k6svkdg58zy";
   };
 
   case_fail = ./FailingTest.java;
@@ -94,12 +92,13 @@ stdenv.mkDerivation rec {
     rm -rf $src/facebook-clang-plugins
     ln -s ${facebook-clang-plugins} $src/facebook-clang-plugins
     chmod -R u+w $src/facebook-clang-plugins
+
     pushd $src/facebook-clang-plugins/clang > /dev/null
     [[ -h include ]] && rm include
     [[ -h install ]] && rm install
-    ln -s ${facebook-clang} $src/facebook-clang-plugins/clang/install
-    ln -s ${facebook-clang}/include $src/facebook-clang-plugins/clang/include
-    shasum -a 256 setup.sh src/clang-7.0.tar.xz > installed.version
+    ln -sfv ${facebook-clang} ./install
+    ln -sfv ${facebook-clang}/include ./include
+    shasum -a 256 setup.sh src/llvm_clang_compiler-rt_libcxx_libcxxabi_openmp-7.0.1.tar.xz > installed.version
     popd > /dev/null
   '';
 
@@ -107,6 +106,7 @@ stdenv.mkDerivation rec {
 
   configureFlags =
        stdenv.lib.optionals withC       [ "--with-fcp-clang" ]
+    ++ stdenv.lib.optionals withC       [ "CLANG_PREFIX=${facebook-clang}" ]
     ++ stdenv.lib.optionals (!withC)    [ "--disable-c-analyzers" ]
     ++ stdenv.lib.optionals (!withJava) [ "--disable-java-analyzers" ]
   ;
