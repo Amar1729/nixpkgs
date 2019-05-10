@@ -1,0 +1,61 @@
+Subject: [PATCH] remove codesign use on apple
+
+diff --git a/cmake/modules/AddLLVM.cmake b/cmake/modules/AddLLVM.cmake
+index ce2057f8..8dbed01f 100644
+--- a/llvm/cmake/modules/AddLLVM.cmake
++++ b/llvm/cmake/modules/AddLLVM.cmake
+@@ -1598,26 +1598,6 @@ function(llvm_codesign name)
+   if(NOT LLVM_CODESIGNING_IDENTITY)
+     return()
+   endif()
+-
+-  if(APPLE)
+-    if(NOT CMAKE_CODESIGN)
+-      set(CMAKE_CODESIGN xcrun codesign)
+-    endif()
+-    if(NOT CMAKE_CODESIGN_ALLOCATE)
+-      execute_process(
+-        COMMAND xcrun -f codesign_allocate
+-        OUTPUT_STRIP_TRAILING_WHITESPACE
+-        OUTPUT_VARIABLE CMAKE_CODESIGN_ALLOCATE
+-      )
+-    endif()
+-    add_custom_command(
+-      TARGET ${name} POST_BUILD
+-      COMMAND ${CMAKE_COMMAND} -E
+-              env CODESIGN_ALLOCATE=${CMAKE_CODESIGN_ALLOCATE}
+-              ${CMAKE_CODESIGN} -s ${LLVM_CODESIGNING_IDENTITY}
+-              $<TARGET_FILE:${name}>
+-    )
+-  endif()
+ endfunction()
+ 
+ function(llvm_setup_rpath name)
+diff --git a/cmake/platforms/iOS.cmake b/cmake/platforms/iOS.cmake
+index 69f84797..d15db933 100644
+--- a/llvm/cmake/platforms/iOS.cmake
++++ b/llvm/cmake/platforms/iOS.cmake
+@@ -80,23 +80,3 @@ IF(NOT CMAKE_LIBTOOL)
+   SET(CMAKE_LIBTOOL ${CMAKE_LIBTOOL_val} CACHE FILEPATH "Libtool")
+   message(STATUS "Using libtool ${CMAKE_LIBTOOL}")
+ ENDIF()
+-
+-IF(NOT CMAKE_CODESIGN)
+-  execute_process(COMMAND xcrun -sdk ${CMAKE_OSX_SYSROOT} -find codesign
+-   OUTPUT_VARIABLE CMAKE_CODESIGN_val
+-   ERROR_QUIET
+-   OUTPUT_STRIP_TRAILING_WHITESPACE)
+-  SET(CMAKE_CODESIGN ${CMAKE_CODESIGN_val} CACHE FILEPATH "Codesign")
+-  message(STATUS "Using codesign ${CMAKE_CODESIGN}")
+-ENDIF()
+-
+-IF(NOT CMAKE_CODESIGN_ALLOCATE)
+-  execute_process(
+-    COMMAND xcrun -sdk ${CMAKE_OSX_SYSROOT} -find codesign_allocate
+-    OUTPUT_VARIABLE CMAKE_CODESIGN_ALLOCATE_val
+-    ERROR_QUIET
+-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+-  SET(CMAKE_CODESIGN_ALLOCATE ${CMAKE_CODESIGN_ALLOCATE_val} CACHE
+-      FILEPATH "Codesign_Allocate")
+-  message(STATUS "Using codesign_allocate ${CMAKE_CODESIGN_ALLOCATE}")
+-ENDIF()
