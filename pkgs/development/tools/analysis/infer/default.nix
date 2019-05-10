@@ -1,7 +1,8 @@
 { stdenv, fetchFromGitHub,
 callPackage,
 autoconf, automake, cmake, gcc, git, gnum4, ocaml, opam, openjdk, perl, pkgconfig, python2, sqlite, which, zlib,
-xpc,
+#xpc,
+darwin,
 #withC ? true,
 withJava ? true
 }:
@@ -11,7 +12,8 @@ let
   infer-deps = callPackage ./deps {};
   facebook-clang = callPackage ./clang {
     inherit infer-deps;
-    inherit xpc;
+    #inherit xpc;
+    inherit darwin;
   };
 in
 stdenv.mkDerivation rec {

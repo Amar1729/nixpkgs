@@ -3651,7 +3651,9 @@ in
   inetutils = callPackage ../tools/networking/inetutils { };
 
   infer = callPackage ../development/tools/analysis/infer {
-    inherit (darwin.apple_sdk.libs) xpc;
+    #inherit (darwin) libobjc;
+    #inherit (darwin.apple_sdk.libs) xpc;
+    inherit darwin;
   };
 
   infiniband-diags = callPackage ../tools/networking/infiniband-diags { };

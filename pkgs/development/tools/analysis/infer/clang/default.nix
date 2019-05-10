@@ -5,7 +5,9 @@ cmake, ncurses, perl, python, zlib,
 ocaml, opam,
 infer-deps,
 # Darwin support
-xpc }:
+#xpc }:
+darwin
+}:
 
 let
   # prebuild patch
@@ -105,7 +107,8 @@ stdenv.mkDerivation rec {
     zlib
   ]
   #++ stdenv.lib.optionals stdenv.isLinux [ gcc gcc_multi ]
-  ++ stdenv.lib.optionals stdenv.isDarwin [ xpc ]
+  # will we need corefoundation or any cf-private stuff?
+  ++ stdenv.lib.optionals stdenv.isDarwin [ darwin.libobjc darwin.apple_sdk.libs.xpc ]
   ;
 
   outputs = [ "out" ];
