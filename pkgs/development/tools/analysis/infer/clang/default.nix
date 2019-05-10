@@ -1,13 +1,31 @@
 { stdenv, fetchurl,
 # libs required to build clang
-cmake, ncurses, perl, python,
+cmake, ncurses, perl, python, zlib,
 # ocaml/opam support, libs for required opam packages
 ocaml, opam,
-infer-deps, zlib,
-#autoconf, automake, git, gnum4, pkgconfig, sqlite, which, zlib,
+infer-deps,
 # Darwin support
 xpc }:
 
+let
+  # prebuild patch
+  err_ret_local_block = fetchurl {
+    url = "https://github.com/facebook/facebook-clang-plugins/raw/36266f6c86041896bed32ffec0637fefbc4463e0/clang/src/err_ret_local_block.patch";
+    sha256 = "15q8hygphvnwvnh4lc98cm80ixkk00pbgna5azmrrpvw5x4llvrg";
+  };
+
+  # prebuild patch
+  mangle_suppress_errors = fetchurl {
+    url = "https://github.com/facebook/facebook-clang-plugins/raw/36266f6c86041896bed32ffec0637fefbc4463e0/clang/src/mangle_suppress_errors.patch";
+    sha256 = "1myv2spsj9qqs2ny9fv0ipski3fjnnzamv7dfki6hp3k160nhc3k";
+  };
+
+  # clang patch - applied after build
+  attr_dump_cpu_cases_compilation_fix = fetchurl {
+    url = "https://github.com/facebook/facebook-clang-plugins/raw/36266f6c86041896bed32ffec0637fefbc4463e0/clang/src/attr_dump_cpu_cases_compilation_fix.patch";
+    sha256 = "1ph6hw66sp31a4mg5rp99mghgdgj0qb30gxnih06chczg1gxynd5";
+  };
+in
 stdenv.mkDerivation rec {
   name = "facebook-clang";
   pname = "llvm_clang_compiler-rt_libcxx_libcxxabi_openmp";
@@ -20,6 +38,18 @@ stdenv.mkDerivation rec {
     url = "https://github.com/facebook/facebook-clang-plugins/raw/${tag}/clang/src/${pname}-${version}.tar.xz";
     sha256 = "06c8mv372rvgs2zq5pwlqyh8wx5pp6zrzbyz1a07ld58vwmc2whk";
   };
+
+  patchFlags = [ "--batch" "-p" "2"  ];
+
+  # pre-build patches
+  patches = [
+    err_ret_local_block
+    mangle_suppress_errors
+  ]
+  ++ stdenv.lib.optionals stdenv.isDarwin [
+    # fuck codesign
+    ./codesign.patch
+  ];
 
   # the srcfile looks like a gzip so nix unpackPhase gets confused
   unpackCmd = "tar -xf $src";
@@ -114,6 +144,11 @@ stdenv.mkDerivation rec {
     # clean up opam build files
     rm -rf $OPAMROOT
     mv $OPAM_BACKUP $OPAMROOT
+
+    # patch the built clang
+    pushd $out/install
+    patch --batch -p 2 < ${attr_dump_cpu_cases_compilation_fix}
+    popd
   ";
 
   meta = with stdenv.lib; {

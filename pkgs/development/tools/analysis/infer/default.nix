@@ -1,14 +1,18 @@
 { stdenv, fetchFromGitHub,
-#infer-deps, facebook-clang,
 callPackage,
 autoconf, automake, cmake, gcc, git, gnum4, ocaml, opam, openjdk, perl, pkgconfig, python2, sqlite, which, zlib,
-withC ? true,
+xpc,
+#withC ? true,
 withJava ? true
 }:
 
+let withC = true; in
 let
   infer-deps = callPackage ./deps {};
-  facebook-clang = callPackage ./clang {};
+  facebook-clang = callPackage ./clang {
+    inherit infer-deps;
+    inherit xpc;
+  };
 in
 stdenv.mkDerivation rec {
   pname = "infer";
@@ -24,6 +28,10 @@ stdenv.mkDerivation rec {
 
   # TODO - only fetch this is withC == true
   # why am i fetching this if i'm also depending on facebook-clang as a separate pkg?
+  #
+  # i should fetch this so i can do the linking manually
+  # check : can i just fetchSubmodules=true and go from there?
+  # i think i tried that, but it's tough to force that sutff to make?
   facebook-clang-plugins = fetchFromGitHub {
     owner = "facebook";
     repo = "facebook-clang-plugins";
@@ -66,16 +74,19 @@ stdenv.mkDerivation rec {
     # setup opam stuff
     export OPAMROOT=${infer-deps}/opam
     export OPAM_BACKUP=${infer-deps}/opam.bak
-    export OCAML_VERSION='4.06.1+flambda'
-    export INFER_OPAM_SWITCH=infer-$OCAML_VERSION
+    export OCAML_VERSION='ocaml-variants.4.07.1+flambda'
+    export INFER_OPAM_SWITCH=$OCAML_VERSION
+
     # dumb hack: some opam operations need to write minor build files to opam repo
     chmod u+w ${infer-deps}
+
     # backup stays around if previous builds have failed: make sure to nuke it
     [[ -d $OPAM_BACKUP ]] && (chmod -R u+w $OPAM_BACKUP && rm -rf $OPAM_BACKUP)
     cp -r $OPAMROOT $OPAM_BACKUP
     chmod -R u+w $OPAMROOT
     eval $(SHELL=bash opam config env --switch=$INFER_OPAM_SWITCH)
-  '' + stdenv.lib.optionalString withC ''
+  ''
+  + stdenv.lib.optionalString withC ''
     # link facebook clang plugins and the custom clang itself (bit hacky)
     chmod u+w $src
     rm -rf $src/facebook-clang-plugins
