@@ -100,6 +100,12 @@ stdenv.mkDerivation rec {
     ln -sfv ${facebook-clang}/include ./include
     shasum -a 256 setup.sh src/llvm_clang_compiler-rt_libcxx_libcxxabi_openmp-7.0.1.tar.xz > installed.version
     popd > /dev/null
+  ''
+  + stdenv.lib.optionalString stdenv.isDarwin ''
+    # have to fix SDKROOT (SYSROOT) so clang sees header files (during infer compilation)
+    mkdir -p sdkroot
+    ln -sfv ${stdenv.lib.getDev stdenv.cc.libc} sdkroot/usr
+    export SDKROOT=$(realpath sdkroot)
   '';
 
   preConfigure = "./autogen.sh";
