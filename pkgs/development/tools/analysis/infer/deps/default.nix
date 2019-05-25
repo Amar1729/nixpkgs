@@ -44,6 +44,8 @@ stdenv.mkDerivation rec {
     opam install --deps-only infer . --locked
   '';
 
+  # if this is incuded, add a prefixup phase that deletes dir $OPAMROOT/repo
+
   meta = with stdenv.lib; {
     description = "Opam dependencies for infer";
     longDescription = ''

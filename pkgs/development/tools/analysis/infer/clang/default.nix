@@ -93,6 +93,13 @@ stdenv.mkDerivation rec {
     "-DCMAKE_CXX_FLAGS=-s"
   ];
 
+  # to get rid of infer-deps, we'll have to install a few ocaml libs into this drv?
+  # or figure out a way to depend on parts of caller drv
+  # maybe we can just isntall ocaml+ctypes in a common place to infer
+  # and then let infer handle the rest of it
+  # or we can do the whole thing in infer
+
+  # change this to nativeBuildInputs also?
   buildInputs = [
     cmake
     infer-deps
