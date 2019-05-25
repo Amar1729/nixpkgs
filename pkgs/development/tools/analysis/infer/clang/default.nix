@@ -6,6 +6,8 @@ ocaml, opam,
 infer-deps,
 # Darwin support
 darwin
+# add xcodebuild for xcode-select ?
+#xcodebuild
 }:
 
 let
@@ -117,7 +119,20 @@ stdenv.mkDerivation rec {
   ;
 
   # try manually specifying outputs so we get flags properly made up in infer drv
-  outputs = [ "bin" "include" "lib" "libexec" "share" ];
+  # NO:
+#     these derivations will be built:
+#     /nix/store/pqbv8c9agrd5gpdg25n6b7lr2wa3r1cd-facebook-clang.drv
+#     /nix/store/q165xqldrzxgnv0lmf7gbn6f2mfp0psl-infer-0.16.0.drv
+#   building '/nix/store/pqbv8c9agrd5gpdg25n6b7lr2wa3r1cd-facebook-clang.drv'...
+#   Error: _assignFirst found no valid variant!
+#   builder for '/nix/store/pqbv8c9agrd5gpdg25n6b7lr2wa3r1cd-facebook-clang.drv' failed with exit code 1
+#   cannot build derivation '/nix/store/q165xqldrzxgnv0lmf7gbn6f2mfp0psl-infer-0.16.0.drv': 1 dependencies couldn't be built
+#   error: build of '/nix/store/q165xqldrzxgnv0lmf7gbn6f2mfp0psl-infer-0.16.0.drv' failed
+  #
+  # ?????
+  #
+  # # outputs = [ "bin" "include" "lib" "libexec" "share" ];
+  outputs = [ "out" ];
 
   postUnpack = "
     # setup opam stuff

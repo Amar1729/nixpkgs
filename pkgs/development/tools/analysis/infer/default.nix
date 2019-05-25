@@ -1,12 +1,19 @@
 { stdenv, fetchFromGitHub,
 callPackage,
+cacert,
 autoconf, automake, cmake, gcc, git, gnum4, ocaml, opam, openjdk, perl, pkgconfig, python2, sqlite, which, zlib,
+gmp, mpfr,
 darwin,
 withC ? true,
 withJava ? true
+# , xcodePlatform ? stdenv.targetPlatform.xcodePlatform or "MacOSX"
+# , xcodeVer ? stdenv.targetPlatform.xcodeVer or "9.4.1"
+# , sdkVer ? stdenv.targetPlatform.sdkVer or "10.10"
+, xcodebuild
 }:
 
 let
+  #sdkName = "${xcodePlatform}${sdkVer}";
   infer-deps = callPackage ./deps {};
   facebook-clang = callPackage ./clang {
     inherit infer-deps;
@@ -23,6 +30,7 @@ stdenv.mkDerivation rec {
     repo = "infer";
     rev = "v${version}";
     sha256 = "1fzm5s0cwah6jk37rrb9dsrfd61f2ird3av0imspyi4qyp6pyrm6";
+    fetchSubmodules = true;
   };
 
   # TODO - only fetch this is withC == true
@@ -46,19 +54,29 @@ stdenv.mkDerivation rec {
 
   doCheck = true;
 
-  depsBuildBuild = [ git ];
-
-  nativeBuildInputs = [ which ];
-
-  buildInputs = [
+  # move all/most of these to nativeBuildInputs ?
+  depsBuildBuild = [
     autoconf
     automake
+    cacert
     gnum4
-    infer-deps
+    git
     ocaml
     opam
     perl
     pkgconfig
+    #xcodebuild
+  ]
+  ++ stdenv.lib.optionals withC             [ cmake ]
+  ++ stdenv.lib.optionals withJava          [ openjdk ]
+  ;
+
+  nativeBuildInputs = [ which ];
+
+  buildInputs = [
+    #infer-deps # for gmp and mpfr
+    gmp
+    mpfr
     python2
     sqlite
     # TODO - include ocamlPackages.utop v2.1.0 for infer-repl
@@ -66,8 +84,7 @@ stdenv.mkDerivation rec {
   ]
   # infer will need recent gcc or clang to work properly on linux (custom clang depends on libs)
   #++ stdenv.lib.optionals stdenv.isLinux    [ gcc ]
-  ++ stdenv.lib.optionals withC             [ cmake facebook-clang ]
-  ++ stdenv.lib.optionals withJava          [ openjdk ]
+  ++ stdenv.lib.optionals withC             [ facebook-clang ]
   ;
 
   postUnpack = ''
@@ -91,35 +108,52 @@ stdenv.mkDerivation rec {
 #    popd
 #  ''
   + stdenv.lib.optionalString withC ''
-    # link facebook clang plugins and the custom clang itself (bit hacky)
-    chmod u+w $src
-    rm -rf $src/facebook-clang-plugins
-    ln -s ${facebook-clang-plugins} $src/facebook-clang-plugins
-    chmod -R u+w $src/facebook-clang-plugins
-
-    pushd $src/facebook-clang-plugins/clang > /dev/null
-    [[ -h include ]] && rm include
-    [[ -h install ]] && rm install
-    ln -sfv ${facebook-clang} ./install
-    ln -sfv ${facebook-clang}/include ./include
-    shasum -a 256 setup.sh src/llvm_clang_compiler-rt_libcxx_libcxxabi_openmp-7.0.1.tar.xz > installed.version
-    popd > /dev/null
+    export CLANG_PREFIX=${facebook-clang}
+    $src/facebook-clang-plugins/clang/setup.sh -r
   ''
-  + stdenv.lib.optionalString stdenv.isDarwin ''
+  + stdenv.lib.optionalString (withC && stdenv.isDarwin) ''
     # have to fix SDKROOT (SYSROOT) so clang sees header files (during infer compilation)
     mkdir -p sdkroot
     ln -sfv ${stdenv.lib.getDev stdenv.cc.libc} sdkroot/usr
     export SDKROOT=$(realpath sdkroot)
-  '';
 
-  preConfigure = "./autogen.sh";
+    # still necessary?
+    eval $(SHELL=bash opam env)
+  '';
 
   configureFlags =
        stdenv.lib.optionals withC       [ "--with-fcp-clang" ]
-    ++ stdenv.lib.optionals withC       [ "CLANG_PREFIX=${facebook-clang}" ]
+#    ++ stdenv.lib.optionals withC       [ "CLANG_PREFIX=${facebook-clang}" ]
+# can't set this here, has to be exported? :/
     ++ stdenv.lib.optionals (!withC)    [ "--disable-c-analyzers" ]
     ++ stdenv.lib.optionals (!withJava) [ "--disable-java-analyzers" ]
   ;
+
+#    #export SDKROOT=${sdkName}
+#    export SDKROOT=${darwin.apple_sdk.sdk}
+#    echo ${darwin.apple_sdk.sdk}
+
+  # looks like i was bamBOOZled
+  # this fuckin sdk doesn't have anything there!
+  # SDKROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+  # /nix/store/9jd199393al3ffxrc6q3l2y789airc2l-xcodebuild-0.1.2-pre/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+  # soo ... where tf to find stdio.h ?
+  # check out nix's llvm pkg to figure out if they're doing weird patching? idk
+#  configurePhase = ''
+#    ./autogen.sh
+#
+#    # try this?
+#    #export SYSROOT=${stdenv.lib.getDev stdenv.cc.libc}
+#    #export SDKROOT=$SYSROOT
+#
+#    #export SDKROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+#    echo 'sdkroot:'
+#    echo $SDKROOT
+#    echo 'stopping:'
+#    exit 2
+#    ./configure --with-fcp-clang --enable-c-analyzers --disable-java-analyzers
+#  '';
+  preConfigure = "./autogen.sh";
 
   # make test works for full infer: fails to config_tests if either java or c analyzer is disabled
   checkPhase = "make test || make config_tests";
