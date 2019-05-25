@@ -72,20 +72,24 @@ stdenv.mkDerivation rec {
 
   postUnpack = ''
     # setup opam stuff
-    export OPAMROOT=${infer-deps}/opam
-    export OPAM_BACKUP=${infer-deps}/opam.bak
-    export OCAML_VERSION='ocaml-variants.4.07.1+flambda'
-    export INFER_OPAM_SWITCH=$OCAML_VERSION
+    mkdir -p $out/libexec
+    cp -r ${infer-deps}/opam $out/libexec
+    export OPAMROOT=$out/libexec/opam
+    export OPAMSWITCH='ocaml-variants.4.07.1+flambda'
 
-    # dumb hack: some opam operations need to write minor build files to opam repo
-    chmod u+w ${infer-deps}
-
-    # backup stays around if previous builds have failed: make sure to nuke it
-    [[ -d $OPAM_BACKUP ]] && (chmod -R u+w $OPAM_BACKUP && rm -rf $OPAM_BACKUP)
-    cp -r $OPAMROOT $OPAM_BACKUP
-    chmod -R u+w $OPAMROOT
-    eval $(SHELL=bash opam config env --switch=$INFER_OPAM_SWITCH)
+    eval $(SHELL=bash opam env)
   ''
+#  postUnpack = ''
+#    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
+#    export OPAMSWITCH='ocaml-variants.4.07.1+flambda'
+#    export OPAMROOT=$out/libexec/opam
+#    mkdir -p $out/libexec
+#    pushd $src
+#      opam init --bare --no-setup --disable-sandboxing
+#      opam switch create $OPAMSWITCH
+#      opam install --deps-only infer . --locked
+#    popd
+#  ''
   + stdenv.lib.optionalString withC ''
     # link facebook clang plugins and the custom clang itself (bit hacky)
     chmod u+w $src
@@ -119,14 +123,6 @@ stdenv.mkDerivation rec {
 
   # make test works for full infer: fails to config_tests if either java or c analyzer is disabled
   checkPhase = "make test || make config_tests";
-
-  postInstall = ''
-    # restore original opam state
-    chmod u+w $OPAM_BACKUP
-    rm -rf $OPAMROOT
-    mv $OPAM_BACKUP $OPAMROOT
-    chmod u-w $OPAMROOT
-  '';
 
   meta = with stdenv.lib; {
     description = "A static analyzer for Java, C, C++, and Objective-C";

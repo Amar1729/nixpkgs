@@ -121,19 +121,12 @@ stdenv.mkDerivation rec {
 
   postUnpack = "
     # setup opam stuff
-    export OPAMROOT=${infer-deps}/opam
-    export OPAM_BACKUP=${infer-deps}/opam.bak
-    export OCAML_VERSION='ocaml-variants.4.07.1+flambda'
-    export INFER_OPAM_SWITCH=$OCAML_VERSION
+    mkdir -p $out/libexec
+    cp -r ${infer-deps}/opam $out/libexec
+    export OPAMROOT=$out/libexec/opam
+    export OPAMSWITCH='ocaml-variants.4.07.1+flambda'
 
-    # dumb hack: some opam operations need to write minor build files to opam repo
-    chmod u+w ${infer-deps}
-    # backup stays around if previous builds have failed: make sure to nuke it
-    [[ -d $OPAM_BACKUP ]] && (chmod -R u+w $OPAM_BACKUP && rm -rf $OPAM_BACKUP)
-    cp -r $OPAMROOT $OPAM_BACKUP
-    chmod -R u+w $OPAMROOT
-
-    eval $(SHELL=bash opam config env --switch=$INFER_OPAM_SWITCH)
+    eval $(SHELL=bash opam env)
   ";
 
   preConfigure = ''
@@ -150,10 +143,6 @@ stdenv.mkDerivation rec {
   #postBuild = "make ocaml_doc";
 
   postInstall = "
-    # clean up opam build files
-    rm -rf $OPAMROOT
-    mv $OPAM_BACKUP $OPAMROOT
-
     # patch the built clang
     pushd $out/include
     patch --batch -p 2 < ${attr_dump_cpu_cases_compilation_fix}
