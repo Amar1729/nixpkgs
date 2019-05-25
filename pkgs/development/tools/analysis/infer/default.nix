@@ -1,5 +1,4 @@
-{ stdenv, fetchFromGitHub,
-callPackage,
+{ stdenv, fetchFromGitHub, fetchgit,
 cacert,
 autoconf, automake, cmake, gcc, git, gnum4, ocaml, opam, openjdk, perl, pkgconfig, python2, sqlite, which, zlib,
 gmp, mpfr,
@@ -9,42 +8,47 @@ withJava ? true
 # , xcodePlatform ? stdenv.targetPlatform.xcodePlatform or "MacOSX"
 # , xcodeVer ? stdenv.targetPlatform.xcodeVer or "9.4.1"
 # , sdkVer ? stdenv.targetPlatform.sdkVer or "10.10"
-, xcodebuild
 }:
 
-let
-  #sdkName = "${xcodePlatform}${sdkVer}";
-  infer-deps = callPackage ./deps {};
-  facebook-clang = callPackage ./clang {
-    inherit infer-deps;
-    inherit darwin;
-  };
-in
 stdenv.mkDerivation rec {
   pname = "infer";
   version = "0.16.0";
   name = "${pname}-${version}";
 
-  src = fetchFromGitHub {
-    owner = "facebook";
-    repo = "infer";
-    rev = "v${version}";
-    sha256 = "1fzm5s0cwah6jk37rrb9dsrfd61f2ird3av0imspyi4qyp6pyrm6";
-    fetchSubmodules = true;
-  };
+#  src = fetchFromGitHub {
+#    owner = "facebook";
+#    repo = "infer";
+#    #rev = "4a91616390c058382c703f47653adfaecd31a7d7";
+#    rev = "v${version}";
+#    sha256 = "1c96rpj1j3q69dalgydqmmvh26lvvb977nngqngq7qw4mz002zic";
+#    #fetchSubmodules = withC;
+#  };
+
+# hash is 18marcyh8525nb4k46xg9lnd5wcimacpsfsacqz92rg19h67077j
+# {
+#   "url": "https://github.com/facebook/infer",
+#   "rev": "4a91616390c058382c703f47653adfaecd31a7d7",
+#   "date": "2019-04-23T05:04:32-07:00",
+#   "sha256": "18marcyh8525nb4k46xg9lnd5wcimacpsfsacqz92rg19h67077j",
+#   "fetchSubmodules": true
+# }
 
   # TODO - only fetch this is withC == true
-  # why am i fetching this if i'm also depending on facebook-clang as a separate pkg?
-  #
-  # i should fetch this so i can do the linking manually
-  # check : can i just fetchSubmodules=true and go from there?
-  # 	NO! - not sure why submodules doesnt work, but it doesn't
-  # i think i tried that, but it's tough to force that sutff to make?
-  facebook-clang-plugins = fetchFromGitHub {
-    owner = "facebook";
-    repo = "facebook-clang-plugins";
-    rev = "36266f6c86041896bed32ffec0637fefbc4463e0";
-    sha256 = "1iwpjwjl6p9y0b4s8zcsdwfy8pwik1zv1hl9shwl7k6svkdg58zy";
+  # setting submodules to true doesn't work since nix doesn't update submodules (???)
+  # so i can't cd into the dir, or access it with ${facebook-clang-plugins}
+  # so i don't know how tf to reach it ...
+#  facebook-clang-plugins = fetchFromGitHub {
+#    owner = "facebook";
+#    repo = "facebook-clang-plugins";
+#    rev = "36266f6c86041896bed32ffec0637fefbc4463e0";
+#    sha256 = "1iwpjwjl6p9y0b4s8zcsdwfy8pwik1zv1hl9shwl7k6svkdg58zy";
+#  };
+
+  src = fetchgit {
+    url = "https://github.com/facebook/infer.git";
+    rev = "v0.16.0";
+    sha256 = "18marcyh8525nb4k46xg9lnd5wcimacpsfsacqz92rg19h67077j";
+    fetchSubmodules = withC;
   };
 
   case_fail = ./FailingTest.java;
@@ -84,42 +88,40 @@ stdenv.mkDerivation rec {
   ]
   # infer will need recent gcc or clang to work properly on linux (custom clang depends on libs)
   #++ stdenv.lib.optionals stdenv.isLinux    [ gcc ]
-  ++ stdenv.lib.optionals withC             [ facebook-clang ]
+  #++ stdenv.lib.optionals withC             [ facebook-clang ]
   ;
 
   postUnpack = ''
-    # setup opam stuff
+    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
     mkdir -p $out/libexec
-    cp -r ${infer-deps}/opam $out/libexec
+    export OPAMYES=1
     export OPAMROOT=$out/libexec/opam
     export OPAMSWITCH='ocaml-variants.4.07.1+flambda'
-
-    eval $(SHELL=bash opam env)
+    pushd $src
+      opam init --bare --no-setup --disable-sandboxing
+      opam switch create $OPAMSWITCH
+      opam install --deps-only infer . --locked
+    popd
   ''
-#  postUnpack = ''
-#    export SSL_CERT_FILE=${cacert}/etc/ssl/certs/ca-bundle.crt
-#    export OPAMSWITCH='ocaml-variants.4.07.1+flambda'
-#    export OPAMROOT=$out/libexec/opam
-#    mkdir -p $out/libexec
-#    pushd $src
-#      opam init --bare --no-setup --disable-sandboxing
-#      opam switch create $OPAMSWITCH
-#      opam install --deps-only infer . --locked
-#    popd
+#  + stdenv.lib.optionalString withC ''
+#    export CLANG_PREFIX=${facebook-clang}
+#    $src/facebook-clang-plugins/clang/setup.sh -r
 #  ''
+    #[[ -d $src/facebook-clang-plugins ]] && rm -r $src/facebook-clang-plugins
+    #ln -sfv ${facebook-clang-plugins} $src/facebook-clang-plugins
   + stdenv.lib.optionalString withC ''
-    export CLANG_PREFIX=${facebook-clang}
-    $src/facebook-clang-plugins/clang/setup.sh -r
+    $src/facebook-clang-plugins/clang/setup.sh
   ''
   + stdenv.lib.optionalString (withC && stdenv.isDarwin) ''
     # have to fix SDKROOT (SYSROOT) so clang sees header files (during infer compilation)
     mkdir -p sdkroot
     ln -sfv ${stdenv.lib.getDev stdenv.cc.libc} sdkroot/usr
     export SDKROOT=$(realpath sdkroot)
-
-    # still necessary?
-    eval $(SHELL=bash opam env)
+  '' + ''
+    eval $(opam env)
   '';
+
+  preConfigure = "./autogen.sh";
 
   configureFlags =
        stdenv.lib.optionals withC       [ "--with-fcp-clang" ]
@@ -129,31 +131,11 @@ stdenv.mkDerivation rec {
     ++ stdenv.lib.optionals (!withJava) [ "--disable-java-analyzers" ]
   ;
 
-#    #export SDKROOT=${sdkName}
-#    export SDKROOT=${darwin.apple_sdk.sdk}
-#    echo ${darwin.apple_sdk.sdk}
-
-  # looks like i was bamBOOZled
-  # this fuckin sdk doesn't have anything there!
-  # SDKROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-  # /nix/store/9jd199393al3ffxrc6q3l2y789airc2l-xcodebuild-0.1.2-pre/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-  # soo ... where tf to find stdio.h ?
-  # check out nix's llvm pkg to figure out if they're doing weird patching? idk
-#  configurePhase = ''
-#    ./autogen.sh
-#
-#    # try this?
-#    #export SYSROOT=${stdenv.lib.getDev stdenv.cc.libc}
-#    #export SDKROOT=$SYSROOT
-#
-#    #export SDKROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-#    echo 'sdkroot:'
-#    echo $SDKROOT
-#    echo 'stopping:'
-#    exit 2
-#    ./configure --with-fcp-clang --enable-c-analyzers --disable-java-analyzers
-#  '';
-  preConfigure = "./autogen.sh";
+# incorrect sdkroots:
+#   export SDKROOT=${sdkName}
+#   export SDKROOT=${darwin.apple_sdk.sdk}
+#   echo ${darwin.apple_sdk.sdk}
+#   SDKROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
 
   # make test works for full infer: fails to config_tests if either java or c analyzer is disabled
   checkPhase = "make test || make config_tests";
