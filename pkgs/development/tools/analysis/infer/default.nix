@@ -72,6 +72,15 @@ stdenv.mkDerivation rec {
     #xcodebuild
   ]
   ++ stdenv.lib.optionals withC             [ cmake ]
+  ++ stdenv.lib.optionals (withC && stdenv.isDarwin) [
+    darwin.libobjc
+    darwin.apple_sdk.libs.xpc
+    # clang needs CoreFoundation to build, but i don't think this will work until 10.12 sdk hits?
+    # possibly related
+    # https://github.com/NixOS/nixpkgs/issues/55655
+    #darwin.cf-private
+    #darwin.apple_sdk.frameworks.CoreFoundation
+  ]
   ++ stdenv.lib.optionals withJava          [ openjdk ]
   ;
 
@@ -110,7 +119,7 @@ stdenv.mkDerivation rec {
     #[[ -d $src/facebook-clang-plugins ]] && rm -r $src/facebook-clang-plugins
     #ln -sfv ${facebook-clang-plugins} $src/facebook-clang-plugins
   + stdenv.lib.optionalString withC ''
-    $src/facebook-clang-plugins/clang/setup.sh
+    CLANG_TMP_DIR=$TMPDIR $src/facebook-clang-plugins/clang/setup.sh
   ''
   + stdenv.lib.optionalString (withC && stdenv.isDarwin) ''
     # have to fix SDKROOT (SYSROOT) so clang sees header files (during infer compilation)
