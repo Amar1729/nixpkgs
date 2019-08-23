@@ -1,7 +1,7 @@
 { stdenv, fetchurl, pkgconfig, autoreconfHook, makeWrapper
-, ncurses, cpio, gperf, cdrkit, flex, bison, qemu, pcre, augeas, libxml2
-, acl, libcap, libcap_ng, libconfig, systemd, fuse, yajl, libvirt, hivex
-, gmp, readline, file, numactl, xen, libapparmor
+, ncurses, cpio, gperf, cdrtools, cdrkit, flex, bison, qemu, pcre, augeas, libxml2
+, acl, libcap, libcap_ng, libconfig, systemd, fuse, osxfuse, yajl, libvirt
+, hivex, gmp, readline, file, numactl, xen, libapparmor
 , getopt, perlPackages, ocamlPackages
 , appliance ? null
 , javaSupport ? false, jdk ? null }:
@@ -21,11 +21,17 @@ stdenv.mkDerivation rec {
   nativeBuildInputs = [ pkgconfig ];
   buildInputs = [
     makeWrapper autoreconfHook ncurses cpio gperf
-    cdrkit flex bison qemu pcre augeas libxml2 acl libcap libcap_ng libconfig
-    systemd fuse yajl libvirt gmp readline file hivex
-    numactl xen libapparmor getopt perlPackages.ModuleBuild
-  ] ++ (with perlPackages; [ perl libintl_perl GetoptLong SysVirt ])
+    flex bison qemu pcre augeas libxml2 libconfig
+    yajl libvirt gmp readline file hivex
+    getopt perlPackages.ModuleBuild
+  ] #++ (with perlPackages; [ perl libintl_perl GetoptLong SysVirt ])
+    ++ (with perlPackages; [ perl libintl_perl GetoptLong ])
     ++ (with ocamlPackages; [ ocaml findlib ocamlbuild ocaml_libvirt ocaml_gettext ounit ])
+    ++ stdenv.lib.optionals stdenv.isDarwin
+      [ cdrtools ]
+    ++ stdenv.lib.optionals (!stdenv.isDarwin)
+      [ acl cdrkit fuse libapparmor libcap libcap_ng numactl systemd xen ]
+    ++ stdenv.lib.optionals stdenv.isDarwin [ osxfuse ]
     ++ stdenv.lib.optional javaSupport jdk;
 
   prePatch = ''
@@ -42,9 +48,13 @@ stdenv.mkDerivation rec {
     # some scripts hardcore /usr/bin/env which is not available in the build env
     patchShebangs .
   '';
-  configureFlags = [ "--disable-appliance" "--disable-daemon" "--with-distro=NixOS" ]
-    ++ stdenv.lib.optionals (!javaSupport) [ "--disable-java" "--without-java" ];
-  patches = [ ./libguestfs-syms.patch ];
+  configureFlags = [ "--disable-appliance" "--disable-daemon" ]
+    #++ [ "--disable-perl" ]
+    ++ stdenv.lib.optionals (!javaSupport) [ "--disable-java" "--without-java" ]
+    ++ stdenv.lib.optionals stdenv.isDarwin [ "--with-distro=Darwin" ]
+    ++ stdenv.lib.optionals (!stdenv.isDarwin) [ "--with-distro=NixOS" ];
+  patches = [ ./libguestfs-syms.patch ]
+    ++ stdenv.lib.optionals stdenv.isDarwin [ ./darwin_error.patch ./darwin_gnulib.patch ];
   NIX_CFLAGS_COMPILE="-I${libxml2.dev}/include/libxml2/";
   installFlags = "REALLY_INSTALL=yes";
   enableParallelBuilding = true;

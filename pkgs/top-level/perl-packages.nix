@@ -16054,6 +16054,11 @@ let
     };
     nativeBuildInputs = [ pkgs.pkgconfig ];
     buildInputs = [ pkgs.libvirt CPANChanges TestPod TestPodCoverage XMLXPath ];
+    #buildInputs = [ pkgs.libvirt CPANChanges TestPod TestPodCoverage XMLXPath ]
+    #  ++ stdenv.lib.optionals stdenv.isDarwin [ ExtUtilsLibBuilder ];
+    meta = {
+      platforms = stdenv.lib.platforms.linux;
+    };
   };
 
   TAPParserSourceHandlerpgTAP = buildPerlModule {
