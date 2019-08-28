@@ -3958,6 +3958,8 @@ in
 
   inetutils = callPackage ../tools/networking/inetutils { };
 
+  infer = callPackage ../development/tools/analysis/infer { };
+
   inform7 = callPackage ../development/compilers/inform7 { };
 
   infamousPlugins = callPackage ../applications/audio/infamousPlugins { };
